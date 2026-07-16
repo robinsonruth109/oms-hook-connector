@@ -180,8 +180,8 @@ export default function DashboardPage() {
             </>
           ) : (
             <s-paragraph>
-              Connect this Shopify store to your custom OMS before creating
-              order deliveries.
+              Connect this Shopify store to your custom OMS using its endpoint and
+                API key.
             </s-paragraph>
           )}
 
@@ -268,8 +268,8 @@ export default function DashboardPage() {
 
       <s-section slot="aside" heading="Next step">
         <s-paragraph>
-          Add your OMS endpoint, API key, and webhook secret from the OMS
-          Settings page.
+          Add your OMS endpoint and API key from the OMS Settings page, then test
+          the connection.
         </s-paragraph>
 
         <s-link href="/app/settings">Open OMS Settings</s-link>

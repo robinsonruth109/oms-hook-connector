@@ -36,17 +36,13 @@ model Session {
   @@index([shop])
 }
 
-// Stores one OMS connection configuration for each Shopify store.
-//
-// encryptedApiKey and encryptedWebhookSecret must contain encrypted values.
-// Plain-text secrets must never be stored in these fields.
+// Stores one OMS connection for each Shopify store.
 model OmsConnection {
-  id                     String  @id @default(cuid())
-  shop                   String  @unique
-  endpoint               String
-  encryptedApiKey        String
-  encryptedWebhookSecret String
-  isEnabled              Boolean @default(true)
+  id              String  @id @default(cuid())
+  shop            String  @unique
+  endpoint        String
+  encryptedApiKey String
+  isEnabled       Boolean @default(true)
 
   lastTestedAt      DateTime?
   lastTestSucceeded Boolean?
@@ -59,9 +55,6 @@ model OmsConnection {
 }
 
 // Records incoming Shopify webhook deliveries.
-//
-// shopifyWebhookId is unique so the same Shopify webhook cannot be
-// processed more than once if Shopify retries the delivery.
 model WebhookEvent {
   id               String  @id @default(cuid())
   shop             String
@@ -81,10 +74,7 @@ model WebhookEvent {
   @@index([shopifyOrderId])
 }
 
-// Stores a durable job for delivering an order to the OMS.
-//
-// encryptedPayload contains the encrypted transformed OMS JSON payload.
-// This allows the order to be retried when the OMS endpoint is unavailable.
+// Stores a durable job for sending an order to the OMS.
 model OrderPushJob {
   id             String       @id @default(cuid())
   shop           String
@@ -114,10 +104,7 @@ model OrderPushJob {
   @@index([externalOrderId])
 }
 
-// Stores every attempt to deliver an order to the OMS.
-//
-// Full phone numbers, addresses, API keys, webhook secrets, and raw
-// unencrypted payloads are intentionally not stored in this model.
+// Stores every attempt to send an order to the OMS.
 model OrderPushLog {
   id    String       @id @default(cuid())
   shop  String
