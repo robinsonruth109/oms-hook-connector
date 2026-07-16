@@ -1,34 +1,142 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Prisma database schema for OMS Hook Connector.
+//
+// SQLite is used during local development.
+// We will switch to PostgreSQL before production deployment.
 
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
   provider = "sqlite"
   url      = "file:dev.sqlite"
 }
 
+// Shopify authentication sessions.
+// Shopify's Prisma session-storage package depends on this model.
 model Session {
-  id            String    @id
-  shop          String
-  state         String
-  isOnline      Boolean   @default(false)
-  scope         String?
-  expires       DateTime?
-  accessToken   String
-  userId        BigInt?
-  firstName     String?
-  lastName      String?
-  email         String?
-  accountOwner  Boolean   @default(false)
-  locale        String?
-  collaborator  Boolean?  @default(false)
-  emailVerified Boolean?  @default(false)
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
+
+  @@index([shop])
+}
+
+// Stores one OMS connection configuration for each Shopify store.
+//
+// encryptedApiKey and encryptedWebhookSecret must contain encrypted values.
+// Plain-text secrets must never be stored in these fields.
+model OmsConnection {
+  id                     String  @id @default(cuid())
+  shop                   String  @unique
+  endpoint               String
+  encryptedApiKey        String
+  encryptedWebhookSecret String
+  isEnabled              Boolean @default(true)
+
+  lastTestedAt      DateTime?
+  lastTestSucceeded Boolean?
+  lastTestMessage   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isEnabled])
+}
+
+// Records incoming Shopify webhook deliveries.
+//
+// shopifyWebhookId is unique so the same Shopify webhook cannot be
+// processed more than once if Shopify retries the delivery.
+model WebhookEvent {
+  id               String  @id @default(cuid())
+  shop             String
+  shopifyWebhookId String  @unique
+  topic            String
+  shopifyOrderId   String?
+  status           String  @default("RECEIVED")
+  errorMessage     String?
+
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+
+  orderPushJob OrderPushJob?
+
+  @@index([shop, receivedAt])
+  @@index([shop, status])
+  @@index([shopifyOrderId])
+}
+
+// Stores a durable job for delivering an order to the OMS.
+//
+// encryptedPayload contains the encrypted transformed OMS JSON payload.
+// This allows the order to be retried when the OMS endpoint is unavailable.
+model OrderPushJob {
+  id             String       @id @default(cuid())
+  shop           String
+  webhookEventId String       @unique
+  webhookEvent   WebhookEvent @relation(fields: [webhookEventId], references: [id], onDelete: Cascade)
+
+  externalOrderId  String
+  invoiceId        String?
+  customerName     String?
+  encryptedPayload String
+
+  status        String   @default("PENDING")
+  attempts      Int      @default(0)
+  maxAttempts   Int      @default(7)
+  nextAttemptAt DateTime @default(now())
+  lastError     String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  logs OrderPushLog[]
+
+  @@index([shop, createdAt])
+  @@index([shop, status])
+  @@index([status, nextAttemptAt])
+  @@index([externalOrderId])
+}
+
+// Stores every attempt to deliver an order to the OMS.
+//
+// Full phone numbers, addresses, API keys, webhook secrets, and raw
+// unencrypted payloads are intentionally not stored in this model.
+model OrderPushLog {
+  id    String       @id @default(cuid())
+  shop  String
+  jobId String
+  job   OrderPushJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  externalOrderId String
+  invoiceId       String?
+  status          String
+  attemptNumber   Int
+  httpStatus      Int?
+  durationMs      Int?
+  errorMessage    String?
+  responseSummary String?
+
+  createdAt DateTime @default(now())
+
+  @@index([shop, createdAt])
+  @@index([shop, status])
+  @@index([jobId, attemptNumber])
+  @@index([externalOrderId])
 }
