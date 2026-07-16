@@ -1,0 +1,47 @@
+# Production configuration for the public OMS Hook Connector app
+
+client_id = "fcdab92947a7f2e3e22a2e97c7776744"
+name = "OMS Hook Connector"
+application_url = "https://oms-hook-connector-production.up.railway.app"
+embedded = true
+
+[access_scopes]
+scopes = "read_orders"
+optional_scopes = []
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://oms-hook-connector-production.up.railway.app/auth/callback"
+]
+
+[webhooks]
+api_version = "2026-07"
+
+[[webhooks.subscriptions]]
+topics = ["orders/create"]
+uri = "/webhooks/orders/create"
+
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "/webhooks/app/uninstalled"
+
+[[webhooks.subscriptions]]
+topics = ["app/scopes_update"]
+uri = "/webhooks/app/scopes_update"
+
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request"]
+uri = "/webhooks/compliance"
+
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/redact"]
+uri = "/webhooks/compliance"
+
+[[webhooks.subscriptions]]
+compliance_topics = ["shop/redact"]
+uri = "/webhooks/compliance"
+
+[build]
+include_config_on_deploy = true
+automatically_update_urls_on_dev = false
