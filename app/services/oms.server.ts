@@ -7,8 +7,7 @@ export type OmsOrderItem = {
   price: number;
 };
 
-export type OmsOrderPayload = {
-  apiKey: string;
+export type OmsOrderData = {
   externalOrderId: string;
   invoiceId: string;
   customerName: string;
@@ -21,24 +20,33 @@ export type OmsOrderPayload = {
   items: OmsOrderItem[];
 };
 
+export type OmsOrderPayload = OmsOrderData & {
+  apiKey: string;
+};
+
 export type OmsRequestResult = {
   success: boolean;
   httpStatus: number | null;
   durationMs: number;
   message: string;
   responseSummary: string | null;
+};
+
+export type OmsTestResult = OmsRequestResult & {
   testInvoiceId: string;
 };
 
-const REQUEST_TIMEOUT_MS = 10_000;
+const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_RESPONSE_LENGTH = 500;
 
-function createTestOrder(shop: string, apiKey: string): OmsOrderPayload {
+function createTestOrder(shop: string): OmsOrderData {
   const shopPrefix = shop
     .split(".")[0]
     .replace(/[^a-zA-Z0-9]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
     .toUpperCase()
-    .slice(0, 20);
+    .slice(0, 24);
 
   const uniquePart = `${Date.now()}-${randomUUID()
     .replaceAll("-", "")
@@ -48,7 +56,6 @@ function createTestOrder(shop: string, apiKey: string): OmsOrderPayload {
   const invoiceId = `TEST-${uniquePart}`;
 
   return {
-    apiKey,
     externalOrderId: `${shopPrefix}-${invoiceId}`,
     invoiceId,
     customerName: "Shopify Connection Test",
@@ -69,7 +76,9 @@ function createTestOrder(shop: string, apiKey: string): OmsOrderPayload {
   };
 }
 
-async function readResponseSummary(response: Response): Promise<string | null> {
+async function readResponseSummary(
+  response: Response,
+): Promise<string | null> {
   const responseText = (await response.text()).trim();
 
   if (!responseText) {
@@ -82,7 +91,6 @@ async function readResponseSummary(response: Response): Promise<string | null> {
     const parsed = JSON.parse(responseText) as {
       message?: unknown;
       error?: unknown;
-      success?: unknown;
     };
 
     if (typeof parsed.message === "string") {
@@ -91,7 +99,7 @@ async function readResponseSummary(response: Response): Promise<string | null> {
       summary = parsed.error;
     }
   } catch {
-    // The OMS returned plain text instead of JSON.
+    // The OMS returned plain text rather than JSON.
   }
 
   return summary.slice(0, MAX_RESPONSE_LENGTH);
@@ -101,16 +109,34 @@ function getFailureMessage(
   status: number,
   responseSummary: string | null,
 ): string {
+  if (status === 400) {
+    return responseSummary
+      ? `OMS validation failed: ${responseSummary}`
+      : "The OMS rejected the order data.";
+  }
+
   if (status === 401 || status === 403) {
     return "The OMS rejected the API key.";
   }
 
   if (status === 404) {
-    return "The OMS endpoint was not found. Check the Endpoint URL.";
+    return "The OMS endpoint was not found.";
   }
 
   if (status === 408) {
     return "The OMS request timed out.";
+  }
+
+  if (status === 409) {
+    return responseSummary
+      ? `OMS conflict: ${responseSummary}`
+      : "The OMS reported that this order already exists.";
+  }
+
+  if (status === 422) {
+    return responseSummary
+      ? `OMS validation failed: ${responseSummary}`
+      : "The OMS could not process the order data.";
   }
 
   if (status === 429) {
@@ -121,23 +147,20 @@ function getFailureMessage(
     return `The OMS server returned HTTP ${status}.`;
   }
 
-  if (responseSummary) {
-    return `The OMS rejected the test order: ${responseSummary}`;
-  }
-
-  return `The OMS rejected the test order with HTTP ${status}.`;
+  return responseSummary
+    ? `The OMS rejected the order: ${responseSummary}`
+    : `The OMS rejected the order with HTTP ${status}.`;
 }
 
-export async function testOmsConnection({
+export async function sendOmsOrder({
   endpoint,
-  apiKey,
-  shop,
+  payload,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
 }: {
   endpoint: string;
-  apiKey: string;
-  shop: string;
+  payload: OmsOrderPayload;
+  timeoutMs?: number;
 }): Promise<OmsRequestResult> {
-  const payload = createTestOrder(shop, apiKey);
   const startedAt = Date.now();
 
   try {
@@ -148,7 +171,7 @@ export async function testOmsConnection({
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     const durationMs = Date.now() - startedAt;
@@ -159,9 +182,8 @@ export async function testOmsConnection({
         success: true,
         httpStatus: response.status,
         durationMs,
-        message: `Connection successful. Test order ${payload.invoiceId} was accepted by the OMS.`,
+        message: responseSummary || "Order accepted by the OMS.",
         responseSummary,
-        testInvoiceId: payload.invoiceId,
       };
     }
 
@@ -171,7 +193,6 @@ export async function testOmsConnection({
       durationMs,
       message: getFailureMessage(response.status, responseSummary),
       responseSummary,
-      testInvoiceId: payload.invoiceId,
     };
   } catch (error) {
     const durationMs = Date.now() - startedAt;
@@ -184,9 +205,10 @@ export async function testOmsConnection({
         success: false,
         httpStatus: null,
         durationMs,
-        message: "The OMS did not respond within 10 seconds.",
+        message: `The OMS did not respond within ${Math.ceil(
+          timeoutMs / 1000,
+        )} seconds.`,
         responseSummary: null,
-        testInvoiceId: payload.invoiceId,
       };
     }
 
@@ -199,7 +221,35 @@ export async function testOmsConnection({
           ? `Could not reach the OMS: ${error.message}`
           : "Could not reach the OMS endpoint.",
       responseSummary: null,
-      testInvoiceId: payload.invoiceId,
     };
   }
+}
+
+export async function testOmsConnection({
+  endpoint,
+  apiKey,
+  shop,
+}: {
+  endpoint: string;
+  apiKey: string;
+  shop: string;
+}): Promise<OmsTestResult> {
+  const testOrder = createTestOrder(shop);
+
+  const result = await sendOmsOrder({
+    endpoint,
+    payload: {
+      apiKey,
+      ...testOrder,
+    },
+    timeoutMs: 10_000,
+  });
+
+  return {
+    ...result,
+    message: result.success
+      ? `Connection successful. Test order ${testOrder.invoiceId} was accepted by the OMS.`
+      : result.message,
+    testInvoiceId: testOrder.invoiceId,
+  };
 }
