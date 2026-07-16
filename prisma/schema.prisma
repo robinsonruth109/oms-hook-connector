@@ -83,18 +83,18 @@ model OrderPushJob {
   externalOrderId String
   invoiceId       String?
 
-  // Retained temporarily for backward compatibility with old records.
-  // New orders do not write the customer name into this field.
+  // Kept temporarily for compatibility with old records.
+  // New orders do not write a plaintext customer name here.
   customerName String?
 
-  // Contains the complete OMS order encrypted with AES-256-GCM.
-  // It becomes null after successful delivery or retention expiry.
+  // Complete OMS order encrypted using AES-256-GCM.
+  // Removed after successful delivery or retention expiry.
   encryptedPayload String?
 
-  // Personal order data is kept for at most seven days when delivery fails.
+  // Failed or pending personal data expires after seven days.
   personalDataExpiresAt DateTime?
 
-  // Records when encrypted customer/order data was removed.
+  // Time when the protected order payload was removed.
   payloadPurgedAt DateTime?
 
   status        String   @default("PENDING")
@@ -116,7 +116,7 @@ model OrderPushJob {
   @@index([personalDataExpiresAt])
 }
 
-// Stores every delivery attempt without customer name, phone or address.
+// Stores delivery attempts without names, phones or addresses.
 model OrderPushLog {
   id    String       @id @default(cuid())
   shop  String
@@ -140,8 +140,39 @@ model OrderPushLog {
   @@index([externalOrderId])
 }
 
-// Audit trail showing when the application processes protected data.
-// This table must never contain names, phone numbers or addresses.
+// Tracks a Shopify customers/data_request request.
+//
+// All customer identifiers, requested Shopify order IDs and report
+// contents will be stored only inside encryptedReport.
+model PrivacyDataRequest {
+  id               String @id @default(cuid())
+  shop             String
+  shopifyWebhookId String @unique
+
+  status              String @default("READY")
+  requestedOrderCount Int    @default(0)
+  matchedOrderCount   Int    @default(0)
+
+  // Encrypted JSON report for the authenticated merchant.
+  encryptedReport String?
+
+  // The encrypted report is available for 30 days.
+  expiresAt DateTime
+
+  firstViewedAt    DateTime?
+  lastDownloadedAt DateTime?
+  reportPurgedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shop, createdAt])
+  @@index([shop, status])
+  @@index([expiresAt])
+}
+
+// Audit trail for protected-data processing.
+// Never store names, phones, emails or addresses in this table.
 model ProtectedDataAccessLog {
   id           String  @id @default(cuid())
   shop         String

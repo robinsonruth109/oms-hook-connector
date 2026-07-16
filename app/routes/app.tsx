@@ -1,11 +1,22 @@
-import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Outlet, useLoaderData, useRouteError } from "react-router";
+// app/routes/app.tsx
+
+import type {
+  HeadersFunction,
+  LoaderFunctionArgs,
+} from "react-router";
+import {
+  Outlet,
+  useLoaderData,
+  useRouteError,
+} from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate } from "../shopify.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({
+  request,
+}: LoaderFunctionArgs) => {
   await authenticate.admin(request);
 
   return {
@@ -14,7 +25,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function App() {
-  const { apiKey } = useLoaderData<typeof loader>();
+  const { apiKey } =
+    useLoaderData<typeof loader>();
 
   return (
     <AppProvider embedded apiKey={apiKey}>
@@ -23,9 +35,17 @@ export default function App() {
           Dashboard
         </a>
 
-        <a href="/app/settings">OMS Settings</a>
+        <a href="/app/settings">
+          OMS Settings
+        </a>
 
-        <a href="/app/logs">Delivery Logs</a>
+        <a href="/app/logs">
+          Delivery Logs
+        </a>
+
+        <a href="/app/privacy">
+          Privacy Requests
+        </a>
       </s-app-nav>
 
       <Outlet />
@@ -33,12 +53,12 @@ export default function App() {
   );
 }
 
-// Shopify authentication can throw special responses.
-// This boundary preserves Shopify's required response headers.
 export function ErrorBoundary() {
   return boundary.error(useRouteError());
 }
 
-export const headers: HeadersFunction = (headersArgs) => {
+export const headers: HeadersFunction = (
+  headersArgs,
+) => {
   return boundary.headers(headersArgs);
 };
