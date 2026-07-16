@@ -1,0 +1,43 @@
+# Shopify application configuration
+# OMS Hook Connector
+
+client_id = "cb1d1a0273f243f976afcb79990bf52b"
+name = "oms-hook-connector"
+application_url = "https://example.com"
+embedded = true
+
+[access_scopes]
+scopes = "read_orders"
+use_legacy_install_flow = false
+
+[webhooks]
+api_version = "2026-07"
+
+[[webhooks.subscriptions]]
+topics = ["orders/create"]
+uri = "/webhooks/orders/create"
+
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "/webhooks/app/uninstalled"
+
+[[webhooks.subscriptions]]
+topics = ["app/scopes_update"]
+uri = "/webhooks/app/scopes_update"
+
+[[webhooks.subscriptions]]
+compliance_topics = [
+  "customers/data_request",
+  "customers/redact",
+  "shop/redact"
+]
+uri = "/webhooks/compliance"
+
+[auth]
+redirect_urls = [
+  "https://example.com/api/auth"
+]
+
+[build]
+include_config_on_deploy = true
+automatically_update_urls_on_dev = true
