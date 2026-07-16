@@ -1,26 +1,48 @@
+// app/routes/api.retries.run.tsx
+
 import { timingSafeEqual } from "node:crypto";
 import type { ActionFunctionArgs } from "react-router";
 
-import { runDueOrderRetries } from "../services/order-delivery.server";
+import {
+  runDueOrderRetries,
+} from "../services/order-delivery.server";
+import {
+  runDataRetentionCleanup,
+} from "../services/privacy.server";
 
-function secretsMatch(supplied: string, expected: string): boolean {
-  const suppliedBuffer = Buffer.from(supplied, "utf8");
-  const expectedBuffer = Buffer.from(expected, "utf8");
+function secretsMatch(
+  supplied: string,
+  expected: string,
+): boolean {
+  const suppliedBuffer = Buffer.from(
+    supplied,
+    "utf8",
+  );
 
-  if (suppliedBuffer.length !== expectedBuffer.length) {
+  const expectedBuffer = Buffer.from(
+    expected,
+    "utf8",
+  );
+
+  if (
+    suppliedBuffer.length !==
+    expectedBuffer.length
+  ) {
     return false;
   }
 
-  return timingSafeEqual(suppliedBuffer, expectedBuffer);
+  return timingSafeEqual(
+    suppliedBuffer,
+    expectedBuffer,
+  );
 }
 
-// Opening this endpoint in a browser uses GET.
-// Only authenticated POST requests are allowed.
 export const loader = async () => {
   return Response.json(
     {
       success: false,
-      message: "Method not allowed. Use POST.",
+      message:
+        "Method not allowed. Use POST.",
     },
     {
       status: 405,
@@ -31,16 +53,22 @@ export const loader = async () => {
   );
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const expectedSecret = process.env.OMS_RETRY_SECRET?.trim();
+export const action = async ({
+  request,
+}: ActionFunctionArgs) => {
+  const expectedSecret =
+    process.env.OMS_RETRY_SECRET?.trim();
 
   if (!expectedSecret) {
-    console.error("OMS_RETRY_SECRET is not configured.");
+    console.error(
+      "OMS_RETRY_SECRET is not configured.",
+    );
 
     return Response.json(
       {
         success: false,
-        message: "Retry worker is not configured.",
+        message:
+          "Retry worker is not configured.",
       },
       {
         status: 503,
@@ -48,16 +76,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
   }
 
-  const authorization = request.headers.get("authorization") ?? "";
+  const authorization =
+    request.headers.get("authorization") ??
+    "";
+
   const bearerPrefix = "Bearer ";
 
-  const suppliedSecret = authorization.startsWith(bearerPrefix)
-    ? authorization.slice(bearerPrefix.length).trim()
-    : "";
+  const suppliedSecret =
+    authorization.startsWith(bearerPrefix)
+      ? authorization
+          .slice(bearerPrefix.length)
+          .trim()
+      : "";
 
   if (
     !suppliedSecret ||
-    !secretsMatch(suppliedSecret, expectedSecret)
+    !secretsMatch(
+      suppliedSecret,
+      expectedSecret,
+    )
   ) {
     return Response.json(
       {
@@ -71,18 +108,38 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   try {
-    const summary = await runDueOrderRetries({
-      limit: 50,
-    });
+    /*
+     * Cleanup runs before retries so an expired protected
+     * payload can never be delivered after its retention limit.
+     */
+    const retention =
+      await runDataRetentionCleanup({
+        limit: 100,
+      });
 
-    console.info("OMS retry worker completed", summary);
+    const retries =
+      await runDueOrderRetries({
+        limit: 50,
+      });
+
+    console.info(
+      "OMS background worker completed",
+      {
+        retention,
+        retries,
+      },
+    );
 
     return Response.json({
       success: true,
-      ...summary,
+      retention,
+      retries,
     });
   } catch (error) {
-    console.error("OMS retry worker failed", error);
+    console.error(
+      "OMS background worker failed",
+      error,
+    );
 
     return Response.json(
       {
@@ -90,7 +147,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         message:
           error instanceof Error
             ? error.message
-            : "The retry worker failed unexpectedly.",
+            : "The background worker failed unexpectedly.",
       },
       {
         status: 500,

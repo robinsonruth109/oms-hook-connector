@@ -1,7 +1,6 @@
-// Prisma database schema for OMS Hook Connector.
+// prisma/schema.prisma
 //
-// SQLite is used during local development.
-// We will switch to PostgreSQL before production deployment.
+// Database schema for OMS Hook Connector.
 
 generator client {
   provider = "prisma-client-js"
@@ -81,10 +80,22 @@ model OrderPushJob {
   webhookEventId String       @unique
   webhookEvent   WebhookEvent @relation(fields: [webhookEventId], references: [id], onDelete: Cascade)
 
-  externalOrderId  String
-  invoiceId        String?
-  customerName     String?
-  encryptedPayload String
+  externalOrderId String
+  invoiceId       String?
+
+  // Retained temporarily for backward compatibility with old records.
+  // New orders do not write the customer name into this field.
+  customerName String?
+
+  // Contains the complete OMS order encrypted with AES-256-GCM.
+  // It becomes null after successful delivery or retention expiry.
+  encryptedPayload String?
+
+  // Personal order data is kept for at most seven days when delivery fails.
+  personalDataExpiresAt DateTime?
+
+  // Records when encrypted customer/order data was removed.
+  payloadPurgedAt DateTime?
 
   status        String   @default("PENDING")
   attempts      Int      @default(0)
@@ -102,9 +113,10 @@ model OrderPushJob {
   @@index([shop, status])
   @@index([status, nextAttemptAt])
   @@index([externalOrderId])
+  @@index([personalDataExpiresAt])
 }
 
-// Stores every attempt to send an order to the OMS.
+// Stores every delivery attempt without customer name, phone or address.
 model OrderPushLog {
   id    String       @id @default(cuid())
   shop  String
@@ -126,4 +138,22 @@ model OrderPushLog {
   @@index([shop, status])
   @@index([jobId, attemptNumber])
   @@index([externalOrderId])
+}
+
+// Audit trail showing when the application processes protected data.
+// This table must never contain names, phone numbers or addresses.
+model ProtectedDataAccessLog {
+  id           String  @id @default(cuid())
+  shop         String
+  action       String
+  resourceType String
+  resourceId   String?
+  actorType    String  @default("SYSTEM")
+  purpose      String
+
+  createdAt DateTime @default(now())
+
+  @@index([shop, createdAt])
+  @@index([action, createdAt])
+  @@index([resourceType, resourceId])
 }

@@ -7,6 +7,7 @@ import {
   mapShopifyOrderToOms,
   type ShopifyOrderWebhook,
 } from "../services/order-mapper.server";
+import { calculatePersonalDataExpiry } from "../services/privacy.server";
 import { authenticate } from "../shopify.server";
 
 function getShopifyOrderId(
@@ -97,7 +98,7 @@ export const action = async ({
     });
 
   if (existingEvent) {
-    console.log("Duplicate Shopify webhook ignored", {
+    console.info("Duplicate Shopify webhook ignored", {
       shop,
       topic,
       webhookId,
@@ -196,8 +197,7 @@ export const action = async ({
       error,
     });
 
-    // Acknowledge Shopify because retrying the same invalid order
-    // will not fix a missing SKU, phone number, or address.
+    // Retrying the same webhook will not fix missing order data.
     return new Response("Order validation failed", {
       status: 200,
     });
@@ -207,6 +207,8 @@ export const action = async ({
     const encryptedPayload = encryptSecret(
       JSON.stringify(mappedOrder),
     );
+
+    const now = new Date();
 
     await prisma.$transaction(async (transaction) => {
       const event = await transaction.webhookEvent.create({
@@ -219,25 +221,42 @@ export const action = async ({
         },
       });
 
-      await transaction.orderPushJob.create({
+      const job = await transaction.orderPushJob.create({
         data: {
           shop,
           webhookEventId: event.id,
           externalOrderId: mappedOrder.externalOrderId,
           invoiceId: mappedOrder.invoiceId,
-          customerName: mappedOrder.customerName,
+
+          // Do not store the customer name separately in plaintext.
+          customerName: null,
+
           encryptedPayload,
+          personalDataExpiresAt:
+            calculatePersonalDataExpiry(now),
+          payloadPurgedAt: null,
+
           status: "PENDING",
           attempts: 0,
-          nextAttemptAt: new Date(),
+          nextAttemptAt: now,
+        },
+      });
+
+      await transaction.protectedDataAccessLog.create({
+        data: {
+          shop,
+          action: "ORDER_PAYLOAD_ENCRYPTED_AND_STORED",
+          resourceType: "ORDER_PUSH_JOB",
+          resourceId: job.id,
+          actorType: "SYSTEM",
+          purpose:
+            "Temporarily queue the order for delivery to the merchant-configured OMS.",
         },
       });
     });
   } catch (error) {
-    // Two simultaneous deliveries could pass the earlier lookup.
-    // The unique webhook ID database constraint remains the final guard.
     if (isUniqueConstraintError(error)) {
-      console.log("Concurrent duplicate webhook ignored", {
+      console.info("Concurrent duplicate webhook ignored", {
         shop,
         webhookId,
       });
@@ -254,14 +273,12 @@ export const action = async ({
       error,
     });
 
-    // Return an error only when the durable job could not be saved.
-    // Shopify can then retry the webhook delivery.
     return new Response("Unable to queue order", {
       status: 500,
     });
   }
 
-  console.log("Shopify order queued for OMS delivery", {
+  console.info("Shopify order queued for OMS delivery", {
     shop,
     webhookId,
     shopifyOrderId,
