@@ -277,7 +277,7 @@ export async function createPrivacyDataRequestReport({
     dataProcessingPurpose:
       "Shopify order delivery to the merchant-configured order management system.",
     retentionExplanation:
-      "Protected order payloads are removed after successful OMS delivery or after the configured retention period.",
+      "The encrypted order payload is removed after successful OMS delivery. The customer name is retained only until the configured seven-day personal-data retention deadline.",
     orders: reportOrders,
   };
 
@@ -410,17 +410,38 @@ export async function runDataRetentionCleanup({
   const jobsToPurge =
     await prisma.orderPushJob.findMany({
       where: {
-        encryptedPayload: {
-          not: null,
-        },
         OR: [
+          /*
+           * Backward-compatible cleanup for successful jobs that still
+           * contain an encrypted payload.
+           */
           {
             status: "SUCCESS",
+            encryptedPayload: {
+              not: null,
+            },
           },
+
+          /*
+           * At the seven-day deadline, purge both the encrypted payload
+           * and the separately retained customer name.
+           */
           {
             personalDataExpiresAt: {
               lte: now,
             },
+            OR: [
+              {
+                encryptedPayload: {
+                  not: null,
+                },
+              },
+              {
+                customerName: {
+                  not: null,
+                },
+              },
+            ],
           },
         ],
       },
@@ -462,7 +483,17 @@ export async function runDataRetentionCleanup({
           },
           data: {
             encryptedPayload: null,
-            customerName: null,
+
+            /*
+             * Successful jobs keep the customer name until the retention
+             * deadline. Once that deadline is reached, remove it as well.
+             */
+            ...(expiryReached
+              ? {
+                  customerName: null,
+                }
+              : {}),
+
             payloadPurgedAt: now,
 
             ...(wasStillActive
@@ -501,9 +532,9 @@ export async function runDataRetentionCleanup({
               "ORDER_PUSH_JOB",
             resourceId: job.id,
             actorType: "SYSTEM",
-            purpose: wasStillActive
-              ? "Enforce the seven-day personal-data retention limit."
-              : "Remove customer data after successful OMS delivery.",
+            purpose: expiryReached
+              ? "Enforce the seven-day personal-data retention limit by removing the encrypted payload and retained customer name."
+              : "Remove the encrypted order payload after successful OMS delivery while retaining the customer name until the configured retention deadline.",
           },
         });
       },

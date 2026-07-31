@@ -228,8 +228,12 @@ export const action = async ({
           externalOrderId: mappedOrder.externalOrderId,
           invoiceId: mappedOrder.invoiceId,
 
-          // Do not store the customer name separately in plaintext.
-          customerName: null,
+          /*
+           * Retain only the customer name separately so the merchant
+           * can identify this delivery in Delivery Logs. The encrypted
+           * payload still protects the phone number and address.
+           */
+          customerName: mappedOrder.customerName,
 
           encryptedPayload,
           personalDataExpiresAt:
