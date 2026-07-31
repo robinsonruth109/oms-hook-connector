@@ -266,12 +266,12 @@ export async function processOrderPushJob({
   if (currentJob.status === "SUCCESS") {
     /*
      * Backward-compatible cleanup for successful jobs created
-     * before immediate payload purging was implemented.
+     * before immediate encrypted-payload purging was implemented.
+     *
+     * Keep customerName available for the Delivery Logs page until
+     * the configured personal-data retention period expires.
      */
-    if (
-      currentJob.encryptedPayload !== null ||
-      currentJob.customerName !== null
-    ) {
+    if (currentJob.encryptedPayload !== null) {
       const now = new Date();
 
       await prisma.$transaction(
@@ -282,7 +282,6 @@ export async function processOrderPushJob({
             },
             data: {
               encryptedPayload: null,
-              customerName: null,
               payloadPurgedAt: now,
             },
           });
@@ -296,7 +295,7 @@ export async function processOrderPushJob({
               resourceId: currentJob.id,
               actorType: "SYSTEM",
               purpose:
-                "Remove customer data after successful OMS delivery.",
+                "Remove the encrypted order payload after successful OMS delivery while retaining the customer name until the configured retention deadline.",
             },
           });
         },
@@ -544,13 +543,14 @@ export async function processOrderPushJob({
           completedAt,
 
           /*
-           * After successful transfer, this connector no longer
-           * needs the customer's name, phone or address.
+           * After successful transfer, remove the encrypted payload
+           * containing the phone number and address. Keep customerName
+           * temporarily so the merchant can identify the delivery in
+           * Delivery Logs. The retention cleanup removes it later.
            */
           ...(finalStatus === "SUCCESS"
             ? {
                 encryptedPayload: null,
-                customerName: null,
                 payloadPurgedAt:
                   completedAt ?? new Date(),
               }
@@ -584,7 +584,7 @@ export async function processOrderPushJob({
             resourceId: job.id,
             actorType: "SYSTEM",
             purpose:
-              "Remove customer data immediately after successful OMS delivery.",
+              "Remove the encrypted order payload immediately after successful OMS delivery while retaining the customer name until the configured retention deadline.",
           },
         });
       }
