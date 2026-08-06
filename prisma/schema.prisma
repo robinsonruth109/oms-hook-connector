@@ -83,18 +83,24 @@ model OrderPushJob {
   externalOrderId String
   invoiceId       String?
 
-  // Kept temporarily for compatibility with old records.
-  // New orders do not write a plaintext customer name here.
+  // Retained for up to seven days so merchants can identify
+  // the order in Delivery Logs.
   customerName String?
 
   // Complete OMS order encrypted using AES-256-GCM.
   // Removed after successful delivery or retention expiry.
   encryptedPayload String?
 
-  // Failed or pending personal data expires after seven days.
+  // Current fulfillment status synchronized from Shopify.
+  shopifyFulfillmentStatus    String    @default("UNFULFILLED")
+  shopifyFulfillmentUpdatedAt DateTime?
+  shopifyFulfillmentSyncedAt  DateTime?
+  shopifyFulfilledAt          DateTime?
+
+  // Retained customer data expires after seven days.
   personalDataExpiresAt DateTime?
 
-  // Time when the protected order payload was removed.
+  // Time when the encrypted order payload was removed.
   payloadPurgedAt DateTime?
 
   status        String   @default("PENDING")
@@ -114,6 +120,7 @@ model OrderPushJob {
   @@index([status, nextAttemptAt])
   @@index([externalOrderId])
   @@index([personalDataExpiresAt])
+  @@index([shop, shopifyFulfillmentStatus])
 }
 
 // Stores delivery attempts without names, phones or addresses.

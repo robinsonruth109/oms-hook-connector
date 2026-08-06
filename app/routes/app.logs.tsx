@@ -16,6 +16,7 @@ import {
   processOrderPushJob,
   runDueOrderRetries,
 } from "../services/order-delivery.server";
+import { reconcileRecentOrderFulfillmentStatuses } from "../services/order-status-sync.server";
 import { authenticate } from "../shopify.server";
 
 type ActionResult = {
@@ -26,8 +27,41 @@ type ActionResult = {
 export const loader = async ({
   request,
 }: LoaderFunctionArgs) => {
-  const { session } =
+  const { admin, session } =
     await authenticate.admin(request);
+
+  const syncCandidates =
+    await prisma.orderPushJob.findMany({
+      where: {
+        shop: session.shop,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 50,
+      select: {
+        id: true,
+        webhookEvent: {
+          select: {
+            shopifyOrderId: true,
+          },
+        },
+      },
+    });
+
+  const syncSummary =
+    await reconcileRecentOrderFulfillmentStatuses({
+      shop: session.shop,
+      jobs: syncCandidates.map((job) => ({
+        id: job.id,
+        shopifyOrderId:
+          job.webhookEvent.shopifyOrderId,
+      })),
+      graphql: (query, variables) =>
+        admin.graphql(query, {
+          variables,
+        }),
+    });
 
   const now = new Date();
 
@@ -66,6 +100,7 @@ export const loader = async ({
 
   return {
     dueRetryCount,
+    syncSummary,
     jobs: jobs.map((job) => {
       const latestLog = job.logs[0] ?? null;
 
@@ -77,6 +112,17 @@ export const loader = async ({
         customerName:
           job.customerName,
         status: job.status,
+        shopifyFulfillmentStatus:
+          job.shopifyFulfillmentStatus,
+        shopifyFulfillmentUpdatedAt:
+          job.shopifyFulfillmentUpdatedAt?.toISOString() ??
+          null,
+        shopifyFulfillmentSyncedAt:
+          job.shopifyFulfillmentSyncedAt?.toISOString() ??
+          null,
+        shopifyFulfilledAt:
+          job.shopifyFulfilledAt?.toISOString() ??
+          null,
         attempts: job.attempts,
         maxAttempts: job.maxAttempts,
         nextAttemptAt:
@@ -187,6 +233,20 @@ function formatDate(
   ).format(new Date(value));
 }
 
+function formatFulfillmentStatus(
+  status: string,
+): string {
+  return status
+    .toLowerCase()
+    .split("_")
+    .map(
+      (part) =>
+        part.charAt(0).toUpperCase() +
+        part.slice(1),
+    )
+    .join(" ");
+}
+
 function statusBackground(
   status: string,
 ): string {
@@ -205,9 +265,38 @@ function statusBackground(
   return "#fdecea";
 }
 
+function fulfillmentStatusBackground(
+  status: string,
+): string {
+  if (status === "FULFILLED") {
+    return "#e8f5e9";
+  }
+
+  if (
+    status === "PARTIALLY_FULFILLED" ||
+    status === "IN_PROGRESS" ||
+    status === "PENDING_FULFILLMENT" ||
+    status === "SCHEDULED"
+  ) {
+    return "#fff8e1";
+  }
+
+  if (
+    status === "REQUEST_DECLINED" ||
+    status === "RESTOCKED"
+  ) {
+    return "#fdecea";
+  }
+
+  return "#f1f2f3";
+}
+
 export default function DeliveryLogsPage() {
-  const { jobs, dueRetryCount } =
-    useLoaderData<typeof loader>();
+  const {
+    jobs,
+    dueRetryCount,
+    syncSummary,
+  } = useLoaderData<typeof loader>();
 
   const actionData =
     useActionData<typeof action>();
@@ -223,6 +312,9 @@ export default function DeliveryLogsPage() {
   const isRunningDue =
     navigation.state === "submitting" &&
     submittingIntent === "retry_due";
+
+  const isRefreshingShopify =
+    navigation.state === "loading";
 
   return (
     <s-page heading="Delivery Logs">
@@ -248,6 +340,63 @@ export default function DeliveryLogsPage() {
           {actionData.message}
         </div>
       ) : null}
+
+      {syncSummary.error ? (
+        <div
+          role="alert"
+          style={{
+            marginBottom: "16px",
+            padding: "14px 16px",
+            borderRadius: "8px",
+            border: "1px solid #e0a3a3",
+            background: "#fff4f4",
+          }}
+        >
+          Shopify status refresh could not be completed: {" "}
+          {syncSummary.error}
+        </div>
+      ) : null}
+
+      <s-section heading="Shopify fulfillment synchronization">
+        <s-stack
+          direction="block"
+          gap="base"
+        >
+          <s-paragraph>
+            Fulfillment status is updated by Shopify webhooks and
+            rechecked against Shopify whenever this page is opened.
+          </s-paragraph>
+
+          <s-paragraph>
+            Checked {syncSummary.checked} recent orders; matched {" "}
+            {syncSummary.matched}; synchronized {syncSummary.updated};
+            unavailable {syncSummary.unavailable}.
+          </s-paragraph>
+
+          <Form method="get">
+            <button
+              type="submit"
+              disabled={isRefreshingShopify}
+              style={{
+                minHeight: "40px",
+                padding: "9px 16px",
+                border: "1px solid #8c9196",
+                borderRadius: "8px",
+                background: "#ffffff",
+                color: "#303030",
+                fontWeight: 600,
+                cursor: isRefreshingShopify
+                  ? "not-allowed"
+                  : "pointer",
+              }}
+            >
+              {isRefreshingShopify
+                ? "Refreshing Shopify statuses…"
+                : "Refresh Shopify statuses"}
+            </button>
+          </Form>
+        </s-stack>
+      </s-section>
 
       <s-section heading="Retry controls">
         <s-stack
@@ -296,7 +445,7 @@ export default function DeliveryLogsPage() {
         </s-stack>
       </s-section>
 
-      <s-section heading="OMS order deliveries">
+      <s-section heading="OMS deliveries and Shopify fulfillment">
         {jobs.length === 0 ? (
           <s-paragraph>
             No Shopify order deliveries have
@@ -360,44 +509,97 @@ export default function DeliveryLogsPage() {
                             color: "#616161",
                           }}
                         >
-                          Invoice:{" "}
+                          Invoice: {" "}
                           {job.invoiceId ??
                             "Not available"}
                         </div>
                       </div>
 
-                      <span
+                      <div
                         style={{
-                          padding:
-                            "5px 10px",
-                          borderRadius:
-                            "999px",
-                          background:
-                            statusBackground(
-                              job.status,
-                            ),
-                          fontWeight: 600,
-                          height:
-                            "fit-content",
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: "8px",
+                          alignItems: "flex-start",
                         }}
                       >
-                        {job.status}
-                      </span>
+                        <span
+                          style={{
+                            padding:
+                              "5px 10px",
+                            borderRadius:
+                              "999px",
+                            background:
+                              statusBackground(
+                                job.status,
+                              ),
+                            fontWeight: 600,
+                            height:
+                              "fit-content",
+                          }}
+                        >
+                          OMS: {job.status}
+                        </span>
+
+                        <span
+                          style={{
+                            padding:
+                              "5px 10px",
+                            borderRadius:
+                              "999px",
+                            background:
+                              fulfillmentStatusBackground(
+                                job.shopifyFulfillmentStatus,
+                              ),
+                            fontWeight: 600,
+                            height:
+                              "fit-content",
+                          }}
+                        >
+                          Shopify: {" "}
+                          {formatFulfillmentStatus(
+                            job.shopifyFulfillmentStatus,
+                          )}
+                        </span>
+                      </div>
                     </div>
 
                     <div>
-                      Customer:{" "}
+                      Customer: {" "}
                       {job.customerName ??
                         "Not available"}
                     </div>
 
                     <div>
-                      Attempts: {job.attempts} /{" "}
+                      Shopify fulfillment updated: {" "}
+                      {formatDate(
+                        job.shopifyFulfillmentUpdatedAt,
+                      )}
+                    </div>
+
+                    <div>
+                      Last synchronized with Shopify: {" "}
+                      {formatDate(
+                        job.shopifyFulfillmentSyncedAt,
+                      )}
+                    </div>
+
+                    {job.shopifyFulfilledAt ? (
+                      <div>
+                        Fulfilled at: {" "}
+                        {formatDate(
+                          job.shopifyFulfilledAt,
+                        )}
+                      </div>
+                    ) : null}
+
+                    <div>
+                      OMS attempts: {job.attempts} / {" "}
                       {job.maxAttempts}
                     </div>
 
                     <div>
-                      Created:{" "}
+                      Order received: {" "}
                       {formatDate(
                         job.createdAt,
                       )}
@@ -408,7 +610,7 @@ export default function DeliveryLogsPage() {
                     job.status ===
                       "PENDING" ? (
                       <div>
-                        Next retry:{" "}
+                        Next OMS retry: {" "}
                         {formatDate(
                           job.nextAttemptAt,
                         )}
@@ -418,14 +620,14 @@ export default function DeliveryLogsPage() {
                     {job.latestLog ? (
                       <>
                         <div>
-                          Latest HTTP status:{" "}
+                          Latest OMS HTTP status: {" "}
                           {job.latestLog
                             .httpStatus ??
                             "No response"}
                         </div>
 
                         <div>
-                          Latest response time:{" "}
+                          Latest OMS response time: {" "}
                           {job.latestLog
                             .durationMs !==
                           null
@@ -498,17 +700,23 @@ export default function DeliveryLogsPage() {
 
       <s-section
         slot="aside"
-        heading="Automatic retries"
+        heading="Synchronization behavior"
       >
         <s-paragraph>
-          Temporary network failures, HTTP
-          408, HTTP 429 and OMS server errors
-          are scheduled for another attempt.
+          Shopify fulfillment webhooks update each matching delivery
+          record when an order is fulfilled, partially fulfilled, or
+          otherwise updated.
         </s-paragraph>
 
         <s-paragraph>
-          Invalid API keys and invalid order
-          data require manual correction.
+          Opening this page also checks recent order statuses directly
+          through Shopify&apos;s GraphQL Admin API to repair missed or
+          delayed webhook updates.
+        </s-paragraph>
+
+        <s-paragraph>
+          Temporary network failures, HTTP 408, HTTP 429 and OMS server
+          errors are scheduled for another OMS delivery attempt.
         </s-paragraph>
       </s-section>
     </s-page>

@@ -12,23 +12,40 @@ include_config_on_deploy = true
 [webhooks]
 api_version = "2026-07"
 
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/app/scopes_update"
-  topics = [ "app/scopes_update" ]
+[[webhooks.subscriptions]]
+uri = "/webhooks/app/scopes_update"
+topics = ["app/scopes_update"]
 
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/app/uninstalled"
-  topics = [ "app/uninstalled" ]
+[[webhooks.subscriptions]]
+uri = "/webhooks/app/uninstalled"
+topics = ["app/uninstalled"]
 
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/orders/create"
-  topics = [ "orders/create" ]
+[[webhooks.subscriptions]]
+uri = "/webhooks/orders/create"
+topics = ["orders/create"]
+
+[[webhooks.subscriptions]]
+topics = [
+  "orders/fulfilled",
+  "orders/partially_fulfilled",
+  "orders/updated"
+]
+uri = "/webhooks/orders/fulfillment"
+include_fields = [
+  "id",
+  "fulfillment_status",
+  "updated_at",
+  "fulfillments.id",
+  "fulfillments.status",
+  "fulfillments.created_at",
+  "fulfillments.updated_at"
+]
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_orders"
-optional_scopes = [ ]
+optional_scopes = []
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ ]
+redirect_urls = []

@@ -238,6 +238,17 @@ export async function createPrivacyDataRequestReport({
               invoiceId: job.invoiceId,
               status: job.status,
               attempts: job.attempts,
+              shopifyFulfillmentStatus:
+                job.shopifyFulfillmentStatus,
+              shopifyFulfillmentUpdatedAt:
+                job.shopifyFulfillmentUpdatedAt?.toISOString() ??
+                null,
+              shopifyFulfillmentSyncedAt:
+                job.shopifyFulfillmentSyncedAt?.toISOString() ??
+                null,
+              shopifyFulfilledAt:
+                job.shopifyFulfilledAt?.toISOString() ??
+                null,
               createdAt:
                 job.createdAt.toISOString(),
               completedAt:

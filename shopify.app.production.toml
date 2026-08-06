@@ -22,6 +22,24 @@ topics = ["orders/create"]
 uri = "/webhooks/orders/create"
 
 [[webhooks.subscriptions]]
+topics = [
+  "orders/fulfilled",
+  "orders/partially_fulfilled",
+  "orders/updated"
+]
+uri = "/webhooks/orders/fulfillment"
+include_fields = [
+  "id",
+  "fulfillment_status",
+  "updated_at",
+  "fulfillments.id",
+  "fulfillments.status",
+  "fulfillments.created_at",
+  "fulfillments.updated_at"
+]
+
+
+[[webhooks.subscriptions]]
 topics = ["app/uninstalled"]
 uri = "/webhooks/app/uninstalled"
 
