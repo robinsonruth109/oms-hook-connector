@@ -1,12 +1,13 @@
-# Production Shopify configuration for OMS Hook Connector
+# Public App Store configuration for TrendyBridgeOMS Hook Connector
 
-client_id = "530ea6396a8bbc045959441138ad344a"
-name = "OMS Hook Connector"
+client_id = "fcdab92947a7f2e3e22a2e97c7776744"
+name = "TrendyBridgeOMS Hook Connector"
 application_url = "https://oms-hook-connector-production.up.railway.app"
 embedded = true
 
 [access_scopes]
 scopes = "read_orders"
+optional_scopes = []
 use_legacy_install_flow = false
 
 [auth]
@@ -37,7 +38,6 @@ include_fields = [
   "fulfillments.created_at",
   "fulfillments.updated_at"
 ]
-
 
 [[webhooks.subscriptions]]
 topics = ["app/uninstalled"]

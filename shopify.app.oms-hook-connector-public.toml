@@ -1,7 +1,7 @@
-# Production configuration for the public OMS Hook Connector app
+# Public App Store configuration for TrendyBridgeOMS Hook Connector
 
 client_id = "fcdab92947a7f2e3e22a2e97c7776744"
-name = "OMS Hook Connector"
+name = "TrendyBridgeOMS Hook Connector"
 application_url = "https://oms-hook-connector-production.up.railway.app"
 embedded = true
 
@@ -39,7 +39,6 @@ include_fields = [
   "fulfillments.updated_at"
 ]
 
-
 [[webhooks.subscriptions]]
 topics = ["app/uninstalled"]
 uri = "/webhooks/app/uninstalled"
@@ -49,16 +48,13 @@ topics = ["app/scopes_update"]
 uri = "/webhooks/app/scopes_update"
 
 [[webhooks.subscriptions]]
-compliance_topics = ["customers/data_request"]
-uri = "/webhooks/compliance"
-
-[[webhooks.subscriptions]]
-compliance_topics = ["customers/redact"]
-uri = "/webhooks/compliance"
-
-[[webhooks.subscriptions]]
-compliance_topics = ["shop/redact"]
+compliance_topics = [
+  "customers/data_request",
+  "customers/redact",
+  "shop/redact"
+]
 uri = "/webhooks/compliance"
 
 [build]
+include_config_on_deploy = true
 automatically_update_urls_on_dev = false

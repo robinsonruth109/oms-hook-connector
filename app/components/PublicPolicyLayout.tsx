@@ -3,6 +3,8 @@ import type {
   ReactNode,
 } from "react";
 
+import { APP_NAME, BUSINESS_NAME, SUPPORT_EMAIL } from "../config/app-info";
+
 type PublicPolicyLayoutProps = {
   title: string;
   description: string;
@@ -87,7 +89,7 @@ export function PublicPolicyLayout({
               fontSize: "18px",
             }}
           >
-            OMS Hook Connector
+            {APP_NAME}
           </a>
 
           <nav
@@ -140,7 +142,7 @@ export function PublicPolicyLayout({
               fontWeight: 700,
             }}
           >
-            Trendy Deal BD
+            {BUSINESS_NAME}
           </div>
 
           <h1
@@ -211,18 +213,18 @@ export function PublicPolicyLayout({
           }}
         >
           <span>
-            © {new Date().getFullYear()} Trendy Deal BD
+            © {new Date().getFullYear()} {BUSINESS_NAME}
           </span>
 
           <a
-            href="mailto:trendysarverbd@gmail.com"
+            href={`mailto:${SUPPORT_EMAIL}`}
             style={{
               color: "#1d4ed8",
               textDecoration: "none",
               fontWeight: 600,
             }}
           >
-            trendysarverbd@gmail.com
+            {SUPPORT_EMAIL}
           </a>
         </div>
       </footer>

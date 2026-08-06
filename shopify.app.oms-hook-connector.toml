@@ -1,9 +1,8 @@
-# Shopify application configuration
-# OMS Hook Connector
+# Staging configuration for TrendyBridgeOMS Hook Connector
 
 client_id = "530ea6396a8bbc045959441138ad344a"
-name = "OMS Hook Connector"
-application_url = "https://example.com"
+name = "TrendyBridgeOMS Hook Connector"
+application_url = "https://oms-hook-connector-staging.up.railway.app"
 embedded = true
 
 [access_scopes]
@@ -13,7 +12,7 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://example.com/api/auth"
+  "https://oms-hook-connector-staging.up.railway.app/auth/callback"
 ]
 
 [webhooks]
@@ -40,7 +39,6 @@ include_fields = [
   "fulfillments.updated_at"
 ]
 
-
 [[webhooks.subscriptions]]
 topics = ["app/uninstalled"]
 uri = "/webhooks/app/uninstalled"
@@ -49,6 +47,14 @@ uri = "/webhooks/app/uninstalled"
 topics = ["app/scopes_update"]
 uri = "/webhooks/app/scopes_update"
 
+[[webhooks.subscriptions]]
+compliance_topics = [
+  "customers/data_request",
+  "customers/redact",
+  "shop/redact"
+]
+uri = "/webhooks/compliance"
+
 [build]
 include_config_on_deploy = true
-automatically_update_urls_on_dev = true
+automatically_update_urls_on_dev = false

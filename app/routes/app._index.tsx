@@ -2,6 +2,7 @@ import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 
+import { APP_NAME } from "../config/app-info";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 
@@ -151,7 +152,7 @@ export default function DashboardPage() {
       : "Connected but disabled";
 
   return (
-    <s-page heading="OMS Hook Connector">
+    <s-page heading={APP_NAME}>
       <s-section heading="OMS connection">
         <s-stack direction="block" gap="base">
           <s-paragraph>

@@ -1,20 +1,23 @@
 import type { MetaFunction } from "react-router";
 
 import {
+  APP_NAME,
+  BUSINESS_NAME,
+  OPERATIONAL_DATA_RETENTION_DAYS,
+  PERSONAL_DATA_RETENTION_DAYS,
+  SUPPORT_EMAIL,
+} from "../config/app-info";
+import {
   PolicyList,
   PolicySection,
   PublicPolicyLayout,
 } from "../components/PublicPolicyLayout";
 
 export const meta: MetaFunction = () => [
-  {
-    title:
-      "Security | OMS Hook Connector",
-  },
+  { title: `Security | ${APP_NAME}` },
   {
     name: "description",
-    content:
-      "Security practices and vulnerability reporting for OMS Hook Connector.",
+    content: `Security practices and vulnerability reporting for ${APP_NAME}.`,
   },
 ];
 
@@ -22,17 +25,14 @@ export default function SecurityPage() {
   return (
     <PublicPolicyLayout
       title="Security"
-      description="A summary of the technical and operational controls used to protect OMS Hook Connector."
-      lastUpdated="July 17, 2026"
+      description={`A summary of the technical and operational controls used to protect ${APP_NAME}.`}
+      lastUpdated="August 6, 2026"
     >
       <PolicySection title="Security approach">
         <p>
-          Trendy Deal BD applies data
-          minimization, encryption, authenticated
-          access, retention controls and audit
-          logging to reduce the risk associated
-          with processing Shopify order
-          information.
+          {BUSINESS_NAME} applies data minimization, encryption, authenticated
+          access, retention controls and audit logging to reduce the risk
+          associated with processing Shopify order information.
         </p>
       </PolicySection>
 
@@ -51,7 +51,8 @@ export default function SecurityPage() {
       <PolicySection title="Authentication and access">
         <PolicyList
           items={[
-            "Embedded merchant pages require Shopify administrator authentication.",
+            "Installation and app launch begin from Shopify-owned surfaces.",
+            "Embedded merchant pages require Shopify administrator authentication and session tokens.",
             "Privacy reports are restricted to the authenticated Shopify shop that received the request.",
             "Background retry and cleanup endpoints require a separate bearer secret.",
             "Webhook authenticity is verified through the Shopify application authentication library.",
@@ -63,37 +64,42 @@ export default function SecurityPage() {
       <PolicySection title="Data minimization and retention">
         <PolicyList
           items={[
-            "Customer names are not stored in a separate plaintext delivery-job field for new orders.",
-            "Protected order payloads are deleted immediately after successful OMS delivery.",
-            "Undelivered protected payloads expire after seven days.",
-            "Operational delivery metadata expires after 30 days.",
-            "Encrypted privacy reports expire after 30 days.",
+            "After successful OMS delivery, the encrypted payload containing the phone number and address is removed immediately.",
+            `The customer name is retained separately for no more than ${PERSONAL_DATA_RETENTION_DAYS} days so the merchant can identify a Delivery Logs record.`,
+            `Undelivered protected payloads expire after ${PERSONAL_DATA_RETENTION_DAYS} days.`,
+            `Operational delivery and fulfillment metadata expires after ${OPERATIONAL_DATA_RETENTION_DAYS} days.`,
+            `Encrypted privacy reports expire after ${OPERATIONAL_DATA_RETENTION_DAYS} days.`,
             "Raw OMS responses are not retained because they could repeat customer information.",
+          ]}
+        />
+      </PolicySection>
+
+      <PolicySection title="Synchronization safeguards">
+        <PolicyList
+          items={[
+            "Shopify order creation webhooks queue eligible orders for OMS delivery.",
+            "Fulfilled, partially fulfilled and updated-order webhooks update the matching Delivery Logs record.",
+            "Opening Delivery Logs performs a GraphQL reconciliation check for recent orders to repair missed or delayed webhook updates.",
+            "Webhook identifiers provide idempotency protection against duplicate delivery processing.",
           ]}
         />
       </PolicySection>
 
       <PolicySection title="Audit logging">
         <p>
-          The application records security and
-          protected-data actions such as payload
-          encryption, decryption for OMS
-          delivery, retention cleanup, privacy
-          report generation and merchant report
-          download.
+          The application records security and protected-data actions such as
+          payload encryption, decryption for OMS delivery, retention cleanup,
+          privacy report generation and merchant report download.
         </p>
-
         <p>
-          Audit records are designed not to
-          contain customer names, phone numbers
-          or delivery addresses.
+          Audit records are designed not to contain customer names, phone
+          numbers or delivery addresses.
         </p>
       </PolicySection>
 
       <PolicySection title="Webhook and application security">
         <PolicyList
           items={[
-            "Duplicate Shopify order webhooks are rejected using a unique webhook identifier.",
             "Temporary network and server errors use controlled retry intervals.",
             "Sensitive endpoint responses are sanitized before operational logging.",
             "Shop and customer redaction webhooks delete related records from the application database.",
@@ -104,8 +110,7 @@ export default function SecurityPage() {
 
       <PolicySection title="Security certifications">
         <p>
-          OMS Hook Connector does not currently
-          claim an independent SOC 2, ISO 27001
+          {APP_NAME} does not currently claim an independent SOC 2, ISO 27001
           or similar security certification.
         </p>
       </PolicySection>
@@ -113,12 +118,10 @@ export default function SecurityPage() {
       <PolicySection title="Report a vulnerability">
         <p>
           Send security reports to{" "}
-          <a href="mailto:trendysarverbd@gmail.com?subject=Security%20Vulnerability%20Report">
-            trendysarverbd@gmail.com
-          </a>
-          .
+          <a href={`mailto:${SUPPORT_EMAIL}?subject=Security%20Vulnerability%20Report`}>
+            {SUPPORT_EMAIL}
+          </a>.
         </p>
-
         <PolicyList
           items={[
             "Explain the affected page or feature.",
@@ -132,12 +135,9 @@ export default function SecurityPage() {
 
       <PolicySection title="Incident response">
         <p>
-          Suspected incidents are investigated
-          to identify the affected systems,
-          contain unauthorized access, protect
-          credentials, preserve relevant audit
-          information and notify affected
-          parties where required.
+          Suspected incidents are investigated to identify affected systems,
+          contain unauthorized access, protect credentials, preserve relevant
+          audit information and notify affected parties where required.
         </p>
       </PolicySection>
     </PublicPolicyLayout>

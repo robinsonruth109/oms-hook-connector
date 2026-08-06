@@ -64,7 +64,7 @@ function createTestOrder(shop: string): OmsOrderData {
     deliveryCharge: 0,
     discount: 0,
     advance: 0,
-    note: "Created automatically by OMS Hook Connector to test the connection.",
+    note: "Created automatically by TrendyBridgeOMS Hook Connector to test the connection.",
     items: [
       {
         sku: "CONNECTION-TEST",

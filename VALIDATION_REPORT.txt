@@ -1,0 +1,28 @@
+TrendyBridgeOMS Hook Connector — review-ready code validation
+Date: 2026-08-06
+
+Source basis
+- Latest full project ZIP supplied by the user.
+- Includes the customer-name Delivery Logs fix.
+- Includes Shopify fulfillment webhook and GraphQL reconciliation changes from commit 527701a.
+
+Completed checks
+- All 30 application TypeScript/TSX files were syntax-transpiled successfully with TypeScript.
+- Every Shopify TOML configuration parses successfully.
+- Every Shopify configuration includes read_orders only.
+- Every Shopify configuration includes orders/create, orders/fulfilled, orders/partially_fulfilled, orders/updated, app/uninstalled, and app/scopes_update.
+- Every Shopify configuration includes customers/data_request, customers/redact, and shop/redact compliance topics.
+- Manual shop-domain login routes and forms were removed.
+- The source package contains no .env file, database file, build output, node_modules, backup files, or exposed reviewer API key.
+- App name is consistent as TrendyBridgeOMS Hook Connector across runtime and Shopify app configuration.
+- Privacy and security disclosures match the seven-day customer-name retention behavior.
+
+Build note
+- The fulfillment-sync base project passed Prisma validation, Prisma generation, ESLint, TypeScript typecheck, and production build on the user's computer before these review-readiness edits.
+- A complete npm reinstall/build could not be repeated in the artifact container because its npm registry mirror was missing an upstream dependency. The edited TypeScript/TSX source passed syntax transpilation, but the user should still run the commands in README.md after extraction.
+
+External work not contained in source code
+- Production Railway deployment and database migration.
+- Shopify public app configuration release.
+- App Store category, pricing, screenshots, video, URLs, screencast, and testing-instruction updates.
+- Revocation and replacement of any exposed reviewer API key.

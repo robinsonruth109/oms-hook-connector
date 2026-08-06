@@ -1,28 +1,26 @@
-# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+# Public App Store configuration for TrendyBridgeOMS Hook Connector
 
-client_id = "530ea6396a8bbc045959441138ad344a"
-name = "OMS Hook Connector"
-application_url = "https://example.com"
+client_id = "fcdab92947a7f2e3e22a2e97c7776744"
+name = "TrendyBridgeOMS Hook Connector"
+application_url = "https://oms-hook-connector-production.up.railway.app"
 embedded = true
 
-[build]
-automatically_update_urls_on_dev = true
-include_config_on_deploy = true
+[access_scopes]
+scopes = "read_orders"
+optional_scopes = []
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://oms-hook-connector-production.up.railway.app/auth/callback"
+]
 
 [webhooks]
 api_version = "2026-07"
 
 [[webhooks.subscriptions]]
-uri = "/webhooks/app/scopes_update"
-topics = ["app/scopes_update"]
-
-[[webhooks.subscriptions]]
-uri = "/webhooks/app/uninstalled"
-topics = ["app/uninstalled"]
-
-[[webhooks.subscriptions]]
-uri = "/webhooks/orders/create"
 topics = ["orders/create"]
+uri = "/webhooks/orders/create"
 
 [[webhooks.subscriptions]]
 topics = [
@@ -41,11 +39,22 @@ include_fields = [
   "fulfillments.updated_at"
 ]
 
-[access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_orders"
-optional_scopes = []
-use_legacy_install_flow = false
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "/webhooks/app/uninstalled"
 
-[auth]
-redirect_urls = []
+[[webhooks.subscriptions]]
+topics = ["app/scopes_update"]
+uri = "/webhooks/app/scopes_update"
+
+[[webhooks.subscriptions]]
+compliance_topics = [
+  "customers/data_request",
+  "customers/redact",
+  "shop/redact"
+]
+uri = "/webhooks/compliance"
+
+[build]
+include_config_on_deploy = true
+automatically_update_urls_on_dev = false

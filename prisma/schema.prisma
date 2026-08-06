@@ -1,6 +1,6 @@
 // prisma/schema.prisma
 //
-// Database schema for OMS Hook Connector.
+// Database schema for TrendyBridgeOMS Hook Connector.
 
 generator client {
   provider = "prisma-client-js"
